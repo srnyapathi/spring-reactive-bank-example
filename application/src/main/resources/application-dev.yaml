@@ -1,0 +1,44 @@
+profile: dev
+
+POSTGRESS_URL: r2dbc:postgresql://localhost:5432/appdb?timeZone=UTC
+POSTGRESS_USER: app
+POSTGRESS_PASSWORD: app123
+
+spring:
+  application:
+    name: Springmo Bank Backend
+  config:
+    activate:
+      on-profile: dev
+
+  r2dbc:
+    url: ${POSTGRESS_URL}
+    username: ${POSTGRESS_USER}
+    password: ${POSTGRESS_PASSWORD}
+    pool:
+      enabled: true
+      initial-size: 10
+      max-size: 20
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  sql:
+    init:
+      mode: never
+
+server:
+  port: 8080
+
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: DEBUG
+    org.hibernate: INFO

@@ -1,0 +1,168 @@
+@startuml Sequence - Perform Transaction
+
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+title Transaction Flow - Perform Transaction (Complete)
+
+actor Client
+participant "TransactionController" as Controller
+participant "TransactionService" as Service
+participant "TransactionServiceImpl" as ServiceImpl
+participant "OperationTypeDatabaseAdapter" as OpAdapter
+participant "TransactionFactory" as Factory
+participant "TransactionHandler" as Handler
+participant "OperationTypeService" as OpTypeService
+participant "TransactionDatabaseAdapter" as TxAdapter
+database "Database" as DB
+
+== Transaction Request ==
+Client -> Controller: POST /transactions\n{accountId, operationTypeId, amount}
+activate Controller
+
+Controller -> Service: performTransaction(accountId, operationTypeId, amount)
+activate Service
+
+Service -> ServiceImpl: performTransaction(accountId, operationTypeId, amount)
+activate ServiceImpl
+
+== Fetch Operation Type ==
+ServiceImpl -> OpAdapter: getOperationTypes()
+activate OpAdapter
+
+OpAdapter -> DB: SELECT * FROM operation_types
+activate DB
+DB --> OpAdapter: List<OperationType>
+deactivate DB
+
+OpAdapter --> ServiceImpl: Mono<Map<String, OperationType>>
+deactivate OpAdapter
+
+ServiceImpl -> ServiceImpl: getOperationTypesMap()\nConvert to Map<Long, OperationType>
+
+ServiceImpl -> ServiceImpl: operationType = map.get(operationTypeId)
+
+alt Operation Type Not Found
+    ServiceImpl --> Controller: Mono.error(InvalidOperationTypeException)
+    Controller --> Client: 400 Bad Request\n"Invalid Operation Type ID"
+    deactivate ServiceImpl
+    deactivate Service
+    deactivate Controller
+else Operation Type Found
+
+    == Resolve Transaction Handler ==
+    ServiceImpl -> Factory: getHandlerReactive(operationType.getHandler())
+    activate Factory
+
+    Factory -> Factory: resolveHandler(normalizedHandler)
+    note right: Switch on SupportedTransactionEnum:\n- CASH_PURCHASE_TRANSACTION\n- INSTALLMENT_PURCHASE\n- WITHDRAWAL\n- PAYMENT
+
+    alt Invalid Handler Type
+        Factory --> Controller: Mono.error(InvalidOperationTypeException)
+        Controller --> Client: 400 Bad Request\n"Unsupported Handler Type"
+        deactivate Factory
+        deactivate ServiceImpl
+        deactivate Service
+        deactivate Controller
+    else Valid Handler Type
+        Factory --> ServiceImpl: Mono<TransactionHandler>
+        deactivate Factory
+
+        == Execute Transaction ==
+        ServiceImpl -> Handler: performTransaction(accountId, amount)
+        activate Handler
+
+        == Validation Phase ==
+        Handler -> Handler: validate(accountId, amount)
+
+        alt Validation Failed (Null Account)
+            Handler --> Controller: Mono.error(InvalidAccountException)
+            Controller --> Client: 400 Bad Request\n"Account cannot be null"
+            deactivate Handler
+            deactivate ServiceImpl
+            deactivate Service
+            deactivate Controller
+        else Validation Failed (Invalid Amount)
+            Handler --> Controller: Mono.error(InvalidAmountException)
+            Controller --> Client: 400 Bad Request\n"Amount must be > 0"
+            deactivate Handler
+            deactivate ServiceImpl
+            deactivate Service
+            deactivate Controller
+        else Validation Passed
+
+            Handler -> Handler: execute(accountId, amount)
+
+            == Get Operation Type Details ==
+            Handler -> Handler: getOperationType()
+            Handler -> OpTypeService: getOperationType()
+            activate OpTypeService
+            OpTypeService --> Handler: Mono<Map<String, OperationType>>
+            deactivate OpTypeService
+
+            Handler -> Handler: filter by handler name
+            Handler -> Handler: get operation type from map
+
+            alt Operation Type Not Found in Map
+                Handler --> Controller: Mono.error(InvalidOperationTypeException)
+                Controller --> Client: 500 Internal Server Error
+                deactivate Handler
+                deactivate ServiceImpl
+                deactivate Service
+                deactivate Controller
+            else Operation Type Found
+
+                == Build Transaction Object ==
+                Handler -> Handler: Build Transaction:\n- account: AccountNumber(accountId)\n- amount: getAmount(amount, transactionType)\n- operationType: operationType\n- eventDate: LocalDateTime.now()\n- active: true
+
+                note right of Handler
+                    getAmount() logic:
+                    - DEBIT: amount.negate()
+                    - CREDIT: amount (positive)
+                end note
+
+                == Persist Transaction ==
+                Handler -> TxAdapter: saveTransaction(transaction)
+                activate TxAdapter
+
+                alt Transaction Object Invalid
+                    TxAdapter --> Handler: Mono.error(InvalidTransactionObjectException)
+                    Handler --> Controller: Mono.error
+                    Controller --> Client: 500 Internal Server Error
+                    deactivate TxAdapter
+                    deactivate Handler
+                    deactivate ServiceImpl
+                    deactivate Service
+                    deactivate Controller
+                else Transaction Valid
+                    TxAdapter -> DB: INSERT INTO transactions\nVALUES (...)
+                    activate DB
+                    DB --> TxAdapter: Saved Transaction with ID
+                    deactivate DB
+
+                    TxAdapter --> Handler: Mono<Transaction>
+                    deactivate TxAdapter
+
+                    Handler -> Handler: log: "Transaction saved successfully"
+
+                    Handler --> ServiceImpl: Mono<Transaction>
+                    deactivate Handler
+
+                    ServiceImpl -> ServiceImpl: log: "Transaction completed"
+                    ServiceImpl --> Service: Mono<Transaction>
+                    deactivate ServiceImpl
+
+                    Service --> Controller: Mono<Transaction>
+                    deactivate Service
+
+                    Controller --> Client: 200 OK\n{transactionId, amount, operationType, ...}
+                    deactivate Controller
+                end
+            end
+        end
+    end
+end
+
+@enduml
+

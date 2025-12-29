@@ -1,0 +1,78 @@
+@startuml Transaction Processing Sequence
+
+!theme plain
+skinparam sequenceMessageAlign center
+
+title Complete Transaction Processing Flow
+
+actor Client
+participant Controller
+participant Service
+participant ServiceImpl
+participant OpAdapter
+participant Factory
+participant Handler
+participant OpTypeService
+participant TxAdapter
+database DB
+
+Client -> Controller: POST /transactions
+activate Controller
+
+Controller -> ServiceImpl: performTransaction()
+activate ServiceImpl
+
+ServiceImpl -> OpAdapter: getOperationTypes()
+activate OpAdapter
+OpAdapter -> DB: SELECT *
+activate DB
+DB --> OpAdapter: OperationTypes
+deactivate DB
+OpAdapter --> ServiceImpl: Map<String, OperationType>
+deactivate OpAdapter
+
+ServiceImpl -> ServiceImpl: find by ID
+
+alt Operation Type Not Found
+    ServiceImpl --> Client: 400 Bad Request
+else Found
+    ServiceImpl -> Factory: getHandlerReactive()
+    activate Factory
+    Factory -> Factory: resolveHandler()
+    Factory --> ServiceImpl: TransactionHandler
+    deactivate Factory
+
+    ServiceImpl -> Handler: performTransaction()
+    activate Handler
+    Handler -> Handler: validate()
+
+    alt Validation Failed
+        Handler --> Client: 400 Bad Request
+    else Success
+        Handler -> Handler: execute()
+        Handler -> OpTypeService: getOperationType()
+        activate OpTypeService
+        OpTypeService --> Handler: OperationType
+        deactivate OpTypeService
+
+        Handler -> TxAdapter: saveTransaction()
+        activate TxAdapter
+        TxAdapter -> DB: INSERT
+        activate DB
+        DB --> TxAdapter: Transaction
+        deactivate DB
+        TxAdapter --> Handler: Transaction
+        deactivate TxAdapter
+
+        Handler --> ServiceImpl: Transaction
+        deactivate Handler
+        ServiceImpl --> Controller: Transaction
+        deactivate ServiceImpl
+        Controller --> Client: 200 OK
+    end
+end
+
+deactivate Controller
+
+@enduml
+

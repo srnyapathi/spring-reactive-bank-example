@@ -1,0 +1,82 @@
+@startuml Sequence - Create Account
+
+!theme plain
+skinparam sequenceMessageAlign center
+
+title Account Flow - Create Account
+
+actor Client
+participant "AccountController" as Controller
+participant "AccountService" as Service
+participant "AccountServiceImpl" as ServiceImpl
+participant "AccountDatabaseAdapter" as Adapter
+database "PostgreSQL" as DB
+
+== Account Creation Request ==
+
+Client -> Controller: POST /accounts\n{documentNumber}
+activate Controller
+
+Controller -> Controller: Build Account object:\n- documentNumber\n- accountNumber: generated\n- active: true\n- createdAt: now()
+
+Controller -> Service: createAccount(account)
+activate Service
+
+Service -> ServiceImpl: createAccount(account)
+activate ServiceImpl
+
+== Persist Account ==
+
+ServiceImpl -> ServiceImpl: Mono.just(account)
+
+ServiceImpl -> Adapter: createAccount(account)
+activate Adapter
+
+Adapter -> Adapter: Map domain Account to Entity
+note right: AccountMapper.toEntity()
+
+Adapter -> DB: INSERT INTO accounts\nVALUES (document_number, account_number, ...)
+activate DB
+
+alt Duplicate Document Number
+    DB --> Adapter: DuplicateKeyException
+    deactivate DB
+
+    Adapter --> ServiceImpl: DuplicateKeyException
+    deactivate Adapter
+
+    ServiceImpl -> ServiceImpl: onErrorMap:\nDuplicateKeyException -> DuplicateAccountException
+
+    ServiceImpl -> ServiceImpl: log: "Duplicate document number"
+
+    ServiceImpl --> Controller: Mono.error(DuplicateAccountException)
+    deactivate ServiceImpl
+    deactivate Service
+
+    Controller --> Client: 409 Conflict\n"Account with document number already exists"
+    deactivate Controller
+
+else Account Created Successfully
+    DB --> Adapter: Saved Account Entity
+    deactivate DB
+
+    Adapter -> Adapter: Map Entity to domain Account
+    note right: AccountMapper.toDomain()
+
+    Adapter --> ServiceImpl: Mono<Account>
+    deactivate Adapter
+
+    ServiceImpl -> ServiceImpl: doOnSuccess:\nlog: "Account created successfully: {accountNumber}"
+
+    ServiceImpl --> Service: Mono<Account>
+    deactivate ServiceImpl
+
+    Service --> Controller: Mono<Account>
+    deactivate Service
+
+    Controller --> Client: 201 Created\n{accountNumber, documentNumber, createdAt, ...}
+    deactivate Controller
+end
+
+@enduml
+

@@ -1,0 +1,185 @@
+@startuml Domain Exception Hierarchy
+
+skinparam classAttributeIconSize 0
+skinparam class {
+    BackgroundColor<<exception>> #FFE6F0
+    BackgroundColor<<javadoc>> #FFFFCC
+}
+
+title Domain Module - Exception Hierarchy
+
+package "java.lang" {
+    class Exception <<javadoc>> {
+        + Exception()
+        + Exception(String message)
+        + Exception(String message, Throwable cause)
+        + getMessage(): String
+        + getCause(): Throwable
+    }
+}
+
+package "in.srnyapathi.bank.domain.exception" {
+
+    class InvalidTransactionObjectException <<exception>> {
+        + InvalidTransactionObjectException(String message)
+    }
+
+    class InvalidOperationTypeException <<exception>> {
+        + InvalidOperationTypeException(String message)
+        + InvalidOperationTypeException(String message, Throwable cause)
+    }
+
+    class InvalidAmountException <<exception>> {
+        + InvalidAmountException()
+        + InvalidAmountException(String message)
+    }
+
+    class InvalidAccountException <<exception>> {
+        + InvalidAccountException()
+        + InvalidAccountException(String message)
+    }
+
+    class DuplicateAccountException <<exception>> {
+        + DuplicateAccountException(String message)
+    }
+
+    class AccountDoesNotExist <<exception>> {
+        + AccountDoesNotExist(String message)
+    }
+}
+
+' Inheritance
+Exception <|-- InvalidTransactionObjectException
+Exception <|-- InvalidOperationTypeException
+Exception <|-- InvalidAmountException
+Exception <|-- InvalidAccountException
+Exception <|-- DuplicateAccountException
+Exception <|-- AccountDoesNotExist
+
+' Usage notes
+note top of InvalidTransactionObjectException
+    **Thrown when:**
+    Transaction object is null or invalid
+
+    **Thrown by:**
+    - TransactionDatabaseAdapter
+
+    **HTTP Status:** 500 Internal Server Error
+end note
+
+note top of InvalidOperationTypeException
+    **Thrown when:**
+    - Operation type ID not found
+    - Handler type not supported
+    - Handler mapping error
+
+    **Thrown by:**
+    - TransactionServiceImpl
+    - TransactionFactory
+    - TransactionHandler
+
+    **HTTP Status:** 400 Bad Request
+end note
+
+note bottom of InvalidAmountException
+    **Thrown when:**
+    - Amount is null
+    - Amount is zero or negative
+    - Amount fails validation rules
+
+    **Thrown by:**
+    - TransactionHandler (base class)
+    - All handler implementations
+
+    **HTTP Status:** 400 Bad Request
+end note
+
+note bottom of InvalidAccountException
+    **Thrown when:**
+    - Account ID is null
+    - Account ID is invalid format
+    - Account validation fails
+
+    **Thrown by:**
+    - TransactionHandler
+
+    **HTTP Status:** 400 Bad Request
+end note
+
+note right of DuplicateAccountException
+    **Thrown when:**
+    Document number already exists
+
+    **Thrown by:**
+    - AccountServiceImpl
+
+    **Spring Annotation:**
+    @ResponseStatus(code = HttpStatus.CONFLICT)
+
+    **HTTP Status:** 409 Conflict
+end note
+
+note right of AccountDoesNotExist
+    **Thrown when:**
+    Account not found by ID
+
+    **Thrown by:**
+    - AccountService operations
+
+    **HTTP Status:** 404 Not Found
+end note
+
+' Exception categorization
+package "Exception Categories" {
+
+    abstract class ValidationException {
+        Validation-related exceptions
+    }
+
+    abstract class DataIntegrityException {
+        Data integrity violations
+    }
+
+    abstract class NotFoundExceptions {
+        Resource not found
+    }
+}
+
+ValidationException <.. InvalidAmountException : categorized as
+ValidationException <.. InvalidAccountException : categorized as
+ValidationException <.. InvalidTransactionObjectException : categorized as
+ValidationException <.. InvalidOperationTypeException : categorized as
+
+DataIntegrityException <.. DuplicateAccountException : categorized as
+
+NotFoundExceptions <.. AccountDoesNotExist : categorized as
+
+note as ErrorHandling
+    **Error Handling in Reactive Streams**
+
+    All exceptions are used with Mono.error():
+
+    ```java
+    if (invalid) {
+        return Mono.error(
+            new InvalidAmountException("Amount must be > 0")
+        );
+    }
+    ```
+
+    Error propagation through reactive chain:
+    - onErrorMap() - Transform exception
+    - onErrorResume() - Recover from error
+    - doOnError() - Side effect (logging)
+end note
+
+legend right
+    |= HTTP Status |= Exception Type |
+    | 400 Bad Request | Validation exceptions |
+    | 404 Not Found | Resource not found |
+    | 409 Conflict | Duplicate entries |
+    | 500 Internal Server Error | Unexpected errors |
+endlegend
+
+@enduml
+

@@ -1,0 +1,83 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: local-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app123
+      POSTGRES_DB: appdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./persistence/src/main/resources/DDL:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d appdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: local-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_LISTEN_PORT: "5050"
+    ports:
+      - "5050:5050"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  spring-bank-app:
+    image: eclipse-temurin:21-jre-alpine
+    container_name: spring-reactive-bank
+    restart: unless-stopped
+    environment:
+      POSTGRESS_URL: r2dbc:postgresql://postgres:5432/appdb?timeZone=UTC
+      POSTGRESS_USER: app
+      POSTGRESS_PASSWORD: app123
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+      SPRING_PROFILES_ACTIVE: composer
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./application/target:/app
+    working_dir: /app
+    command: >
+      sh -c "
+      echo 'Starting Spring Reactive Bank Application...' &&
+      java $$JAVA_OPTS -jar spring-reactive-bank.jar
+      "
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui
+    container_name: local-swagger-ui
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      SWAGGER_JSON_URL: /swagger-spec.yml
+    volumes:
+      - ./spec/swagger-spec.yml:/usr/share/nginx/html/swagger-spec.yml:ro
+    depends_on:
+      spring-bank-app:
+        condition: service_started
+
+volumes:
+  pgdata:
+  pgadmin_data:

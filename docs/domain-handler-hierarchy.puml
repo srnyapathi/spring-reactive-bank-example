@@ -1,0 +1,183 @@
+@startuml Transaction Handler Hierarchy
+
+skinparam classAttributeIconSize 0
+skinparam class {
+    BackgroundColor<<abstract>> #E6F0FF
+    BackgroundColor<<handler>> #FFE6E6
+    BackgroundColor<<factory>> #F0E6FF
+}
+
+title Domain Module - Transaction Handler Hierarchy (Strategy + Template Method Pattern)
+
+package "in.srnyapathi.bank.domain.service.impl" {
+
+    abstract class TransactionHandler <<abstract>> {
+        # OperationTypeService operationTypeService
+        __
+        **Template Method:**
+        + performTransaction(Long account, BigDecimal amount): Mono<Transaction>
+        __
+        **Common Operations:**
+        # getOperationType(): Mono<OperationType>
+        # isNegativeAmount(BigDecimal amount): boolean
+        # getAmount(BigDecimal amount, TransactionType type): BigDecimal
+        # validate(Long account, BigDecimal amount): Mono<Void>
+        __
+        **Abstract Methods (Strategy):**
+        {abstract} # getHandler(): String
+        {abstract} + execute(Long account, BigDecimal amount): Mono<Transaction>
+    }
+}
+
+package "in.srnyapathi.bank.domain.service.handlers" {
+
+    class CashPurchaseTransactionHandler <<handler>> {
+        - TransactionDatabaseAdapter transactionDatabaseAdapter
+        __
+        # getHandler(): String
+        # validate(Long, BigDecimal): Mono<Void>
+        + execute(Long, BigDecimal): Mono<Transaction>
+        __
+        **Handler ID:** "CASH_PURCHASE_TRANSACTION"
+        **Type:** DEBIT
+    }
+
+    class InstallmentPurchaseTransactionHandler <<handler>> {
+        - TransactionDatabaseAdapter transactionDatabaseAdapter
+        __
+        # getHandler(): String
+        # validate(Long, BigDecimal): Mono<Void>
+        + execute(Long, BigDecimal): Mono<Transaction>
+        __
+        **Handler ID:** "INSTALLMENT_PURCHASE"
+        **Type:** DEBIT
+    }
+
+    class WithdrawalTransactionHandler <<handler>> {
+        - TransactionDatabaseAdapter transactionDatabaseAdapter
+        __
+        # getHandler(): String
+        # validate(Long, BigDecimal): Mono<Void>
+        + execute(Long, BigDecimal): Mono<Transaction>
+        __
+        **Handler ID:** "WITHDRAWAL"
+        **Type:** DEBIT
+    }
+
+    class PaymentTransactionHandler <<handler>> {
+        - TransactionDatabaseAdapter transactionDatabaseAdapter
+        __
+        # getHandler(): String
+        # validate(Long, BigDecimal): Mono<Void>
+        + execute(Long, BigDecimal): Mono<Transaction>
+        __
+        **Handler ID:** "PAYMENT"
+        **Type:** CREDIT
+    }
+}
+
+package "in.srnyapathi.bank.domain.service.factory" {
+
+    class TransactionFactory <<factory>> {
+        - CashPurchaseTransactionHandler cashPurchaseTransactionHandler
+        - InstallmentPurchaseTransactionHandler installmentPurchaseTransactionHandler
+        - PaymentTransactionHandler paymentTransactionHandler
+        - WithdrawalTransactionHandler withdrawalTransactionHandler
+        __
+        + getHandlerReactive(String handlerType): Mono<TransactionHandler>
+        - resolveHandler(String normalizedHandler): TransactionHandler
+        - getSupportedHandlerNames(): String[]
+    }
+}
+
+' Inheritance relationships
+TransactionHandler <|-- CashPurchaseTransactionHandler
+TransactionHandler <|-- InstallmentPurchaseTransactionHandler
+TransactionHandler <|-- WithdrawalTransactionHandler
+TransactionHandler <|-- PaymentTransactionHandler
+
+' Factory relationships
+TransactionFactory o--> CashPurchaseTransactionHandler : creates
+TransactionFactory o--> InstallmentPurchaseTransactionHandler : creates
+TransactionFactory o--> WithdrawalTransactionHandler : creates
+TransactionFactory o--> PaymentTransactionHandler : creates
+TransactionFactory ..> TransactionHandler : returns
+
+' Notes
+note top of TransactionHandler
+    **Template Method Pattern**
+
+    performTransaction() defines the algorithm:
+    1. validate(account, amount)
+    2. execute(account, amount)
+    3. Handle success/error
+
+    Subclasses implement:
+    - getHandler() - returns handler identifier
+    - execute() - specific transaction logic
+    - validate() - optional override for custom validation
+end note
+
+note right of TransactionFactory
+    **Factory Pattern**
+
+    Creates appropriate handler based on
+    SupportedTransactionEnum value:
+
+    Input: "CASH_PURCHASE_TRANSACTION"
+    Output: CashPurchaseTransactionHandler
+
+    Uses switch expression on enum
+    for type-safe handler resolution
+end note
+
+note as PatternNote
+    **Design Patterns Applied:**
+
+    1. **Strategy Pattern**
+       - Strategy Interface: TransactionHandler
+       - Concrete Strategies: Each handler class
+       - Context: TransactionServiceImpl
+
+    2. **Template Method Pattern**
+       - Template: performTransaction()
+       - Primitive Operations: execute(), getHandler()
+       - Hook: validate()
+
+    3. **Factory Pattern**
+       - Factory: TransactionFactory
+       - Products: Handler implementations
+       - Creation Method: getHandlerReactive()
+end note
+
+note bottom of CashPurchaseTransactionHandler
+    **Validation:**
+    - Calls super.validate()
+    - No additional validation
+
+    **Execution:**
+    - Creates DEBIT transaction
+    - Negates amount
+    - Saves to database
+end note
+
+note bottom of PaymentTransactionHandler
+    **Validation:**
+    - Calls super.validate()
+    - Ensures amount is positive
+
+    **Execution:**
+    - Creates CREDIT transaction
+    - Keeps amount positive
+    - Saves to database
+end note
+
+legend right
+    |= Pattern |= Purpose |
+    | Template Method | Define algorithm skeleton |
+    | Strategy | Encapsulate algorithms |
+    | Factory | Centralize object creation |
+endlegend
+
+@enduml
+

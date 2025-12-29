@@ -1,0 +1,177 @@
+@startuml Domain Package Diagram
+
+!theme plain
+skinparam packageStyle rectangle
+
+title Domain Module - Package Structure and Dependencies
+
+package "Domain Module" {
+
+    package "model" <<Rectangle>> #FFF8DC {
+        [Account]
+        [Transaction]
+        [AccountNumber]
+        [OperationType]
+        [TransactionType <<enum>>]
+        [SupportedTransactionEnum <<enum>>]
+    }
+
+    package "adapters" <<Rectangle>> #E6FFFF {
+        [AccountDatabaseAdapter]
+        [TransactionDatabaseAdapter]
+        [OperationTypeDatabaseAdapter]
+    }
+
+    package "service" <<Rectangle>> #E6F3E6 {
+        [AccountService]
+        [TransactionService]
+        [OperationTypeService]
+    }
+
+    package "service.impl" <<Rectangle>> #E6F0FF {
+        [AccountServiceImpl]
+        [TransactionServiceImpl]
+        [OperationTypeServiceImpl]
+        [TransactionHandler <<abstract>>]
+    }
+
+    package "service.handlers" <<Rectangle>> #FFE6E6 {
+        [CashPurchaseTransactionHandler]
+        [InstallmentPurchaseTransactionHandler]
+        [WithdrawalTransactionHandler]
+        [PaymentTransactionHandler]
+    }
+
+    package "service.factory" <<Rectangle>> #F0E6FF {
+        [TransactionFactory]
+    }
+
+    package "exception" <<Rectangle>> #FFE6F0 {
+        [InvalidTransactionObjectException]
+        [InvalidOperationTypeException]
+        [InvalidAmountException]
+        [InvalidAccountException]
+        [DuplicateAccountException]
+        [AccountDoesNotExist]
+    }
+
+    package "config" <<Rectangle>> #E6E6E6 {
+        [DomainModuleConfiguration]
+    }
+}
+
+' Dependencies
+service --> model : uses
+service.impl --> service : implements
+service.impl --> model : uses
+service.impl --> adapters : depends on
+service.impl --> exception : throws
+
+service.handlers --> service.impl : extends
+service.handlers --> model : uses
+service.handlers --> adapters : depends on
+service.handlers --> exception : throws
+
+service.factory --> service.handlers : creates
+service.factory --> service.impl : returns
+service.factory --> model : uses
+
+adapters --> model : uses
+
+' Annotations for clarity
+note right of model
+    **Core Domain Entities**
+    - Account (Aggregate Root)
+    - Transaction (Entity)
+    - AccountNumber (Value Object)
+    - OperationType (Entity)
+    - Enumerations for types
+end note
+
+note right of adapters
+    **Hexagonal Architecture - Ports**
+
+    Interfaces that define contracts
+    for external dependencies.
+
+    Implemented in persistence module.
+
+    Enables:
+    - Testability (mock implementations)
+    - Flexibility (swap implementations)
+    - Dependency inversion
+end note
+
+note right of service
+    **Business Logic Layer**
+
+    Defines domain operations:
+    - Account management
+    - Transaction processing
+    - Operation type queries
+
+    All operations are reactive (Mono/Flux)
+end note
+
+note right of service.impl
+    **Service Implementations**
+
+    Contains concrete implementations
+    and abstract base classes.
+
+    Orchestrates business logic using:
+    - Domain models
+    - Database adapters
+    - Exception handling
+end note
+
+note right of service.handlers
+    **Strategy Pattern Implementation**
+
+    Each handler implements specific
+    transaction type logic:
+
+    - CashPurchase (Debit)
+    - InstallmentPurchase (Debit)
+    - Withdrawal (Debit)
+    - Payment (Credit)
+end note
+
+note right of service.factory
+    **Factory Pattern**
+
+    Creates appropriate transaction
+    handler based on operation type.
+
+    Uses SupportedTransactionEnum
+    for type-safe resolution.
+end note
+
+note right of exception
+    **Domain Exceptions**
+
+    Business rule violations:
+    - Invalid inputs
+    - Duplicate entries
+    - Not found errors
+
+    All extend Exception for
+    checked exception handling
+    in reactive streams.
+end note
+
+legend bottom right
+    **Architecture Patterns:**
+    - Hexagonal (Ports & Adapters)
+    - Strategy (Transaction Handlers)
+    - Factory (Handler Creation)
+    - Template Method (Handler Base)
+
+    **Technology:**
+    - Spring Boot 3.x
+    - Project Reactor (Reactive)
+    - Java 17+
+endlegend
+
+@enduml
+

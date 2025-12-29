@@ -1,0 +1,328 @@
+@startuml Domain Module - Complete Class Diagram
+
+!define COMPONENT_STYLE true
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 80
+
+' Color scheme
+skinparam class {
+    BackgroundColor<<model>> #FFF8DC
+    BackgroundColor<<service>> #E6F3E6
+    BackgroundColor<<impl>> #E6F0FF
+    BackgroundColor<<handler>> #FFE6E6
+    BackgroundColor<<adapter>> #E6FFFF
+    BackgroundColor<<exception>> #FFE6F0
+    BackgroundColor<<factory>> #F0E6FF
+    BackgroundColor<<enum>> #FFFFCC
+    BackgroundColor<<valueObject>> #E6E6FA
+    BorderColor Black
+    ArrowColor Black
+}
+
+title Domain Module - Complete Class Diagram
+
+' ==================== MODEL LAYER ====================
+package "in.srnyapathi.bank.domain.model" <<Rectangle>> {
+
+    class Account <<model>> {
+        - String documentNumber
+        - Long accountNumber
+        - LocalDateTime updatedAt
+        - LocalDateTime createdAt
+        - boolean active
+        __
+        + builder(): AccountBuilder
+        + getters/setters()
+    }
+
+    class Transaction <<model>> {
+        - Long transactionId
+        - AccountNumber account
+        - OperationType operationType
+        - BigDecimal amount
+        - LocalDateTime eventDate
+        - LocalDateTime createdAt
+        - LocalDateTime updatedAt
+        - boolean active
+        __
+        + builder(): TransactionBuilder
+        + getters/setters()
+    }
+
+    class AccountNumber <<valueObject>> {
+        - Long id
+        __
+        + getAccountNumber(): Long
+    }
+
+    class OperationType <<model>> {
+        - Long operationTypeId
+        - String description
+        - String handler
+        - TransactionType transactionType
+        __
+        + getters/setters()
+    }
+
+    enum TransactionType <<enum>> {
+        CREDIT
+        DEBIT
+        __
+        - String name
+        __
+        + getName(): String
+    }
+
+    enum SupportedTransactionEnum <<enum>> {
+        CASH_PURCHASE_TRANSACTION
+        INSTALLMENT_PURCHASE
+        WITHDRAWAL
+        PAYMENT
+    }
+}
+
+' ==================== ADAPTER LAYER ====================
+package "in.srnyapathi.bank.domain.adapters" <<Rectangle>> {
+
+    interface AccountDatabaseAdapter <<adapter>> {
+        + createAccount(Account): Mono<Account>
+        + getAccountByAccountNumber(Long): Mono<Account>
+    }
+
+    interface TransactionDatabaseAdapter <<adapter>> {
+        + saveTransaction(Transaction): Mono<Transaction>
+        + getTransactionById(Long): Mono<Transaction>
+    }
+
+    interface OperationTypeDatabaseAdapter <<adapter>> {
+        + getOperationTypes(): Mono<Map<String, OperationType>>
+        + updateOperationTypes(OperationType): Mono<Map<String, OperationType>>
+        + addOperationType(OperationType): Mono<Map<String, OperationType>>
+        + deleteOperationType(Long): Mono<Map<String, OperationType>>
+    }
+}
+
+' ==================== SERVICE LAYER ====================
+package "in.srnyapathi.bank.domain.service" <<Rectangle>> {
+
+    interface AccountService <<service>> {
+        + createAccount(Account): Mono<Account>
+        + getAccount(Mono<Long>): Mono<Account>
+    }
+
+    interface TransactionService <<service>> {
+        + performTransaction(Long, Long, BigDecimal): Mono<Transaction>
+    }
+
+    interface OperationTypeService <<service>> {
+        + getOperationType(): Mono<Map<String, OperationType>>
+    }
+}
+
+' ==================== SERVICE IMPLEMENTATION ====================
+package "in.srnyapathi.bank.domain.service.impl" <<Rectangle>> {
+
+    class AccountServiceImpl <<impl>> {
+        - AccountDatabaseAdapter accountDatabaseAdapter
+        __
+        + createAccount(Account): Mono<Account>
+        + getAccount(Mono<Long>): Mono<Account>
+    }
+
+    class TransactionServiceImpl <<impl>> {
+        - TransactionFactory transactionFactory
+        - OperationTypeDatabaseAdapter operationTypeDatabaseAdapter
+        __
+        + performTransaction(Long, Long, BigDecimal): Mono<Transaction>
+        - getOperationTypesMap(Map): Map<Long, OperationType>
+    }
+
+    class OperationTypeServiceImpl <<impl>> {
+        - OperationTypeDatabaseAdapter operationTypeDatabase
+        __
+        + getOperationType(): Mono<Map<String, OperationType>>
+    }
+
+    abstract class TransactionHandler <<impl>> {
+        # OperationTypeService operationTypeService
+        __
+        # isNegativeAmount(BigDecimal): boolean
+        # getAmount(BigDecimal, TransactionType): BigDecimal
+        # getOperationType(): Mono<OperationType>
+        # validate(Long, BigDecimal): Mono<Void>
+        + performTransaction(Long, BigDecimal): Mono<Transaction>
+        __
+        {abstract} # getHandler(): String
+        {abstract} + execute(Long, BigDecimal): Mono<Transaction>
+    }
+}
+
+' ==================== TRANSACTION HANDLERS ====================
+package "in.srnyapathi.bank.domain.service.handlers" <<Rectangle>> {
+
+    class CashPurchaseTransactionHandler <<handler>> {
+        - TransactionDatabaseAdapter transactionDatabaseAdapter
+        __
+        # getHandler(): String
+        # validate(Long, BigDecimal): Mono<Void>
+        + execute(Long, BigDecimal): Mono<Transaction>
+    }
+
+    class InstallmentPurchaseTransactionHandler <<handler>> {
+        - TransactionDatabaseAdapter transactionDatabaseAdapter
+        __
+        # getHandler(): String
+        # validate(Long, BigDecimal): Mono<Void>
+        + execute(Long, BigDecimal): Mono<Transaction>
+    }
+
+    class WithdrawalTransactionHandler <<handler>> {
+        - TransactionDatabaseAdapter transactionDatabaseAdapter
+        __
+        # getHandler(): String
+        # validate(Long, BigDecimal): Mono<Void>
+        + execute(Long, BigDecimal): Mono<Transaction>
+    }
+
+    class PaymentTransactionHandler <<handler>> {
+        - TransactionDatabaseAdapter transactionDatabaseAdapter
+        __
+        # getHandler(): String
+        # validate(Long, BigDecimal): Mono<Void>
+        + execute(Long, BigDecimal): Mono<Transaction>
+    }
+}
+
+' ==================== FACTORY ====================
+package "in.srnyapathi.bank.domain.service.factory" <<Rectangle>> {
+
+    class TransactionFactory <<factory>> {
+        - CashPurchaseTransactionHandler cashPurchaseTransactionHandler
+        - InstallmentPurchaseTransactionHandler installmentPurchaseTransactionHandler
+        - PaymentTransactionHandler paymentTransactionHandler
+        - WithdrawalTransactionHandler withdrawalTransactionHandler
+        __
+        + getHandlerReactive(String): Mono<TransactionHandler>
+        - resolveHandler(String): TransactionHandler
+        - getSupportedHandlerNames(): String[]
+    }
+}
+
+' ==================== EXCEPTION LAYER ====================
+package "in.srnyapathi.bank.domain.exception" <<Rectangle>> {
+
+    class InvalidTransactionObjectException <<exception>> {
+        + InvalidTransactionObjectException(String)
+    }
+
+    class InvalidOperationTypeException <<exception>> {
+        + InvalidOperationTypeException(String)
+        + InvalidOperationTypeException(String, Throwable)
+    }
+
+    class InvalidAmountException <<exception>> {
+        + InvalidAmountException()
+        + InvalidAmountException(String)
+    }
+
+    class InvalidAccountException <<exception>> {
+        + InvalidAccountException()
+        + InvalidAccountException(String)
+    }
+
+    class DuplicateAccountException <<exception>> {
+        + DuplicateAccountException(String)
+    }
+
+    class AccountDoesNotExist <<exception>> {
+        + AccountDoesNotExist(String)
+    }
+}
+
+' ==================== RELATIONSHIPS ====================
+
+' Model relationships
+Transaction "1" --> "1" AccountNumber : has
+Transaction "1" --> "1" OperationType : uses
+OperationType "1" --> "1" TransactionType : has
+
+' Service implementations
+AccountService <|.. AccountServiceImpl : implements
+TransactionService <|.. TransactionServiceImpl : implements
+OperationTypeService <|.. OperationTypeServiceImpl : implements
+
+' Service dependencies on adapters
+AccountServiceImpl --> AccountDatabaseAdapter : uses
+TransactionServiceImpl --> OperationTypeDatabaseAdapter : uses
+OperationTypeServiceImpl --> OperationTypeDatabaseAdapter : uses
+
+' Adapter dependencies on models
+AccountDatabaseAdapter ..> Account : uses
+TransactionDatabaseAdapter ..> Transaction : uses
+OperationTypeDatabaseAdapter ..> OperationType : uses
+
+' TransactionHandler hierarchy
+TransactionHandler <|-- CashPurchaseTransactionHandler : extends
+TransactionHandler <|-- InstallmentPurchaseTransactionHandler : extends
+TransactionHandler <|-- WithdrawalTransactionHandler : extends
+TransactionHandler <|-- PaymentTransactionHandler : extends
+
+' Handler dependencies
+TransactionHandler --> OperationTypeService : uses
+CashPurchaseTransactionHandler --> TransactionDatabaseAdapter : uses
+InstallmentPurchaseTransactionHandler --> TransactionDatabaseAdapter : uses
+WithdrawalTransactionHandler --> TransactionDatabaseAdapter : uses
+PaymentTransactionHandler --> TransactionDatabaseAdapter : uses
+
+' Factory relationships
+TransactionFactory --> CashPurchaseTransactionHandler : creates
+TransactionFactory --> InstallmentPurchaseTransactionHandler : creates
+TransactionFactory --> WithdrawalTransactionHandler : creates
+TransactionFactory --> PaymentTransactionHandler : creates
+TransactionFactory ..> TransactionHandler : returns
+TransactionFactory ..> SupportedTransactionEnum : uses
+
+' Service to Factory
+TransactionServiceImpl --> TransactionFactory : uses
+
+' Exception relationships (implicit - shown via throws in methods)
+AccountServiceImpl ..> DuplicateAccountException : throws
+TransactionHandler ..> InvalidAccountException : throws
+TransactionHandler ..> InvalidAmountException : throws
+TransactionServiceImpl ..> InvalidOperationTypeException : throws
+TransactionDatabaseAdapter ..> InvalidTransactionObjectException : throws
+
+' Notes
+note top of TransactionHandler
+    **Template Method Pattern**
+    - performTransaction() orchestrates flow
+    - execute() is implemented by subclasses
+    - validate() can be overridden
+end note
+
+note right of TransactionFactory
+    **Factory Pattern**
+    Creates handlers based on
+    SupportedTransactionEnum
+end note
+
+note top of AccountDatabaseAdapter
+    **Hexagonal Architecture - Ports**
+    Interfaces define contracts for
+    external adapters (persistence layer)
+end note
+
+note bottom of SupportedTransactionEnum
+    Defines all transaction
+    types in the system
+end note
+
+note left of TransactionType
+    CREDIT: increases balance
+    DEBIT: decreases balance
+end note
+
+@enduml
+

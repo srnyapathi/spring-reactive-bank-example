@@ -1,0 +1,317 @@
+openapi: 3.0.3
+info:
+  title: Spring Reactive Bank API
+  description: |
+    RESTful API for managing bank accounts and transactions in a reactive Spring Boot application.
+    This API provides endpoints for creating accounts, retrieving account information, and performing transactions.
+  version: 1.0.0
+  contact:
+    name: Bank API Support
+    email: support@bank.com
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+
+tags:
+  - name: Account
+    description: Operations related to bank accounts
+  - name: Transaction
+    description: Operations related to transactions
+
+paths:
+  /accounts:
+    post:
+      summary: Create a new account
+      description: Creates a new bank account with the provided document number
+      operationId: createAccount
+      tags:
+        - Account
+      requestBody:
+        required: true
+        description: Account creation details
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountCreationRequest'
+            examples:
+              example1:
+                summary: Create account example
+                value:
+                  document_number: "12345678900"
+      responses:
+        '201':
+          description: Account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+              examples:
+                example1:
+                  summary: Successful account creation
+                  value:
+                    account_id: 1
+                    document_number: "12345678900"
+        '400':
+          description: Invalid request - validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                validationError:
+                  summary: Validation error
+                  value:
+                    timestamp: "2025-12-28T10:30:00Z"
+                    status: 400
+                    error: "Bad Request"
+                    message: "Document number cannot be empty"
+                    path: "/accounts"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /accounts/{id}:
+    get:
+      summary: Get account by ID
+      description: Retrieves account information for the specified account ID
+      operationId: getAccount
+      tags:
+        - Account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the account
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+          example: 1
+      responses:
+        '200':
+          description: Account retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+              examples:
+                example1:
+                  summary: Successful account retrieval
+                  value:
+                    account_id: 1
+                    document_number: "12345678900"
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  summary: Account not found
+                  value:
+                    timestamp: "2025-12-28T10:30:00Z"
+                    status: 404
+                    error: "Not Found"
+                    message: "Account with id 999 not found"
+                    path: "/accounts/999"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /transactions:
+    post:
+      summary: Create a new transaction
+      description: Creates a new transaction for an account with the specified operation type and amount
+      operationId: createTransaction
+      tags:
+        - Transaction
+      requestBody:
+        required: true
+        description: Transaction creation details
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionCreationRequest'
+            examples:
+              purchase:
+                summary: Purchase transaction
+                value:
+                  account_id: 1
+                  operation_type_id: 1
+                  amount: 123.45
+              payment:
+                summary: Payment transaction
+                value:
+                  account_id: 1
+                  operation_type_id: 4
+                  amount: 100.00
+      responses:
+        '201':
+          description: Transaction created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+              examples:
+                example1:
+                  summary: Successful transaction creation
+                  value:
+                    transaction_id: 1
+                    account_id: 1
+                    operation_type_id: 1
+                    amount: -123.45
+                    event_date: "2025-12-28T10:30:00"
+        '400':
+          description: Invalid request - validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                validationError:
+                  summary: Validation error
+                  value:
+                    timestamp: "2025-12-28T10:30:00Z"
+                    status: 400
+                    error: "Bad Request"
+                    message: "Amount cannot be null"
+                    path: "/transactions"
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    AccountCreationRequest:
+      type: object
+      required:
+        - document_number
+      properties:
+        document_number:
+          type: string
+          description: Customer document number (e.g., CPF, SSN, etc.)
+          minLength: 1
+          example: "12345678900"
+      description: Request payload for creating a new account
+
+    AccountResponse:
+      type: object
+      properties:
+        account_id:
+          type: integer
+          format: int64
+          description: Unique identifier of the account
+          example: 1
+        document_number:
+          type: string
+          description: Customer document number
+          example: "12345678900"
+      description: Response payload containing account information
+
+    TransactionCreationRequest:
+      type: object
+      required:
+        - account_id
+        - operation_type_id
+        - amount
+      properties:
+        account_id:
+          type: integer
+          format: int64
+          description: The account ID associated with this transaction
+          minimum: 1
+          example: 1
+        operation_type_id:
+          type: integer
+          format: int64
+          description: |
+            The type of operation:
+            - 1: Purchase
+            - 2: Installment Purchase
+            - 3: Withdrawal
+            - 4: Payment
+          minimum: 1
+          maximum: 4
+          example: 1
+        amount:
+          type: number
+          description: |
+            Transaction amount (always positive in the request).
+            The system will apply the appropriate sign based on operation type.
+          minimum: 0.01
+          example: 123.45
+      description: Request payload for creating a new transaction
+
+    TransactionResponse:
+      type: object
+      properties:
+        transaction_id:
+          type: integer
+          format: int64
+          description: Unique identifier of the transaction
+          example: 1
+        account_id:
+          type: integer
+          format: int64
+          description: The account ID associated with this transaction
+          example: 1
+        operation_type_id:
+          type: integer
+          format: int64
+          description: The type of operation performed
+          example: 1
+        amount:
+          type: number
+          description: Transaction amount (negative for debits, positive for credits)
+          example: -123.45
+        event_date:
+          type: string
+          format: date-time
+          description: The date and time when the transaction occurred
+          example: "2025-12-28T10:30:00"
+      description: Response payload containing transaction information
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: The timestamp when the error occurred
+          example: "2025-12-28T10:30:00Z"
+        status:
+          type: integer
+          description: HTTP status code
+          example: 400
+        error:
+          type: string
+          description: Error type
+          example: "Bad Request"
+        message:
+          type: string
+          description: Detailed error message
+          example: "Validation failed"
+        path:
+          type: string
+          description: The request path that caused the error
+          example: "/accounts"
+      description: Error response payload
+

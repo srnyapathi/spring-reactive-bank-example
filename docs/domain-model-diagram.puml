@@ -1,0 +1,157 @@
+@startuml Domain Model Layer
+@enduml
+
+endlegend
+    | <<enum>> | Enumeration |
+    | <<valueObject>> | Value Object |
+    | <<model>> | Domain Entity |
+    |= Symbol |= Meaning |
+legend right
+
+end note
+    Determines transaction type
+    Links to transaction handler
+    Defines operation metadata
+
+    **Entity**
+note bottom of OperationType
+
+end note
+    - Payment (Credit)
+    - Withdrawal (Debit)
+    - Installment Purchase (Debit)
+    - Cash Purchase (Debit)
+
+    supported by the system:
+    Defines all transaction types
+
+    **Enum**
+note right of SupportedTransactionEnum
+
+end note
+    impact on account balance
+    Used to determine transaction
+
+    DEBIT: Subtracts from balance (-)
+    CREDIT: Adds to balance (+)
+
+    **Enum**
+note right of TransactionType
+
+end note
+    Compared by value
+    Immutable
+    Encapsulates account identifier
+
+    **Value Object**
+note bottom of AccountNumber
+
+end note
+    Immutable after creation
+    Links to operation type
+    Contains account reference
+    Represents a financial transaction
+
+    **Entity**
+note right of Transaction
+
+end note
+    Audit fields: createdAt, updatedAt
+    Soft delete via 'active' flag
+    Represents a bank account
+
+    **Aggregate Root**
+note right of Account
+' Notes
+
+OperationType "1" --> "1" TransactionType : has type
+Transaction "1" --> "1" OperationType : references
+Transaction "1" *-- "1" AccountNumber : contains
+' Relationships
+
+}
+    }
+        PAYMENT
+        WITHDRAWAL
+        INSTALLMENT_PURCHASE
+        CASH_PURCHASE_TRANSACTION
+    enum SupportedTransactionEnum <<enum>> {
+
+    }
+        + getName(): String
+        __
+        - String name
+        __
+        DEBIT("DR")
+        CREDIT("CR")
+    enum TransactionType <<enum>> {
+
+    }
+        + getters/setters()
+        + getTransactionType(): TransactionType
+        + getHandler(): String
+        + getDescription(): String
+        + getOperationTypeId(): Long
+        __
+        - TransactionType transactionType
+        - String handler
+        - String description
+        - Long operationTypeId
+    class OperationType <<model>> {
+
+    }
+        + getId(): Long
+        + getAccountNumber(): Long
+        + AccountNumber(Long)
+        __
+        - Long id
+    class AccountNumber <<valueObject>> {
+
+    }
+        + getters/setters()
+        + isActive(): boolean
+        + getEventDate(): LocalDateTime
+        + getAmount(): BigDecimal
+        + getOperationType(): OperationType
+        + getAccount(): AccountNumber
+        + getTransactionId(): Long
+        + builder(): TransactionBuilder
+        __
+        - boolean active
+        - LocalDateTime updatedAt
+        - LocalDateTime createdAt
+        - LocalDateTime eventDate
+        - BigDecimal amount
+        - OperationType operationType
+        - AccountNumber account
+        - Long transactionId
+    class Transaction <<model>> {
+
+    }
+        + setters()
+        + isActive(): boolean
+        + getCreatedAt(): LocalDateTime
+        + getUpdatedAt(): LocalDateTime
+        + getAccountNumber(): Long
+        + getDocumentNumber(): String
+        + builder(): AccountBuilder
+        __
+        - boolean active
+        - LocalDateTime createdAt
+        - LocalDateTime updatedAt
+        - Long accountNumber
+        - String documentNumber
+    class Account <<model>> {
+
+package "in.srnyapathi.bank.domain.model" {
+
+title Domain Module - Model Layer
+
+}
+    BackgroundColor<<valueObject>> #E6E6FA
+    BackgroundColor<<enum>> #FFFFCC
+    BackgroundColor<<model>> #FFF8DC
+skinparam class {
+skinparam classAttributeIconSize 0
+
+
