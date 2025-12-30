@@ -2,6 +2,7 @@ package in.srnyapathi.bank.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,6 +18,7 @@ public class TransactionCreationRequest {
 
     @JsonProperty("account_id")
     @NotNull
+    @Positive
     private Long accountId;
 
     @JsonProperty("operation_type_id")
