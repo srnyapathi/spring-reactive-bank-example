@@ -27,6 +27,7 @@ public interface TransactionMapper {
     @Mapping(target = "isActive", source = "active")
     @Mapping(target = "accountId", source = "account.id")
     @Mapping(target = "operationTypeId", source = "operationType.operationTypeId")
+    @Mapping(target = "balance", source = "balance")
     TransactionEntity toEntity(Transaction domain);
 
     /**
@@ -40,5 +41,7 @@ public interface TransactionMapper {
      */
     @Mapping(target = "operationType.operationTypeId", source = "operationTypeId")
     @Mapping(target = "account.id", source = "accountId")
+    @Mapping(target = "balance", source = "balance")
+    @Mapping(target = "active", source = "isActive")
     Transaction toDomain(TransactionEntity domain);
 }

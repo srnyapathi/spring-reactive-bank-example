@@ -2,6 +2,7 @@ package in.srnyapathi.bank.domain.service.handlers;
 
 import in.srnyapathi.bank.domain.adapters.TransactionDatabaseAdapter;
 import in.srnyapathi.bank.domain.exception.InvalidAmountException;
+import in.srnyapathi.bank.domain.model.AccountNumber;
 import in.srnyapathi.bank.domain.model.OperationType;
 import in.srnyapathi.bank.domain.model.Transaction;
 import in.srnyapathi.bank.domain.model.TransactionType;
@@ -90,6 +91,9 @@ class PaymentTransactionHandlerTest {
         Mockito.when(operationTypeService.getOperationType())
                 .thenReturn(Mono.just(getMap(operationType)));
 
+        Mockito.when(transactionDatabaseAdapter.getAllTransactionByAccount(accountId))
+                .thenReturn(reactor.core.publisher.Flux.empty());
+
         Mockito.when(transactionDatabaseAdapter.saveTransaction(Mockito.any(Transaction.class)))
                 .thenAnswer(invocation -> {
                     Transaction transaction = invocation.getArgument(0);
@@ -151,6 +155,9 @@ class PaymentTransactionHandlerTest {
         Mockito.when(operationTypeService.getOperationType())
                 .thenReturn(Mono.just(getMap(operationType)));
 
+        Mockito.when(transactionDatabaseAdapter.getAllTransactionByAccount(accountId))
+                .thenReturn(reactor.core.publisher.Flux.empty());
+
         Mockito.when(transactionDatabaseAdapter.saveTransaction(Mockito.any(Transaction.class)))
                 .thenReturn(Mono.error(new RuntimeException("Database connection failed")));
 
@@ -207,6 +214,9 @@ class PaymentTransactionHandlerTest {
         Mockito.when(operationTypeService.getOperationType())
                 .thenReturn(Mono.just(getMap(operationType)));
 
+        Mockito.when(transactionDatabaseAdapter.getAllTransactionByAccount(accountId))
+                .thenReturn(reactor.core.publisher.Flux.empty());
+
         Mockito.when(transactionDatabaseAdapter.saveTransaction(Mockito.any(Transaction.class)))
                 .thenAnswer(invocation -> {
                     Transaction transaction = invocation.getArgument(0);
@@ -243,6 +253,9 @@ class PaymentTransactionHandlerTest {
         Mockito.when(operationTypeService.getOperationType())
                 .thenReturn(Mono.just(getMap(operationType)));
 
+        Mockito.when(transactionDatabaseAdapter.getAllTransactionByAccount(accountId))
+                .thenReturn(reactor.core.publisher.Flux.empty());
+
         Mockito.when(transactionDatabaseAdapter.saveTransaction(Mockito.any(Transaction.class)))
                 .thenAnswer(invocation -> {
                     Transaction transaction = invocation.getArgument(0);
@@ -271,6 +284,9 @@ class PaymentTransactionHandlerTest {
         Mockito.when(operationTypeService.getOperationType())
                 .thenReturn(Mono.just(getMap(operationType)));
 
+        Mockito.when(transactionDatabaseAdapter.getAllTransactionByAccount(accountId))
+                .thenReturn(reactor.core.publisher.Flux.empty());
+
         Mockito.when(transactionDatabaseAdapter.saveTransaction(Mockito.any(Transaction.class)))
                 .thenAnswer(invocation -> {
                     Transaction transaction = invocation.getArgument(0);
@@ -290,6 +306,322 @@ class PaymentTransactionHandlerTest {
                 .verifyComplete();
     }
 
+    @Test
+    @DisplayName("Should pay off single debt completely when payment equals debt")
+    void shouldPayOffDebtCompletely_whenPaymentEqualsDebt() {
+        Long accountId = 1L;
+        BigDecimal paymentAmount = BigDecimal.valueOf(50.0);
+
+        // Create a debt transaction with -50 balance
+        OperationType debitOperationType = new OperationType(1L,
+                "NORMAL PURCHASE", "PURCHASE", TransactionType.DEBIT);
+
+        Transaction debtTransaction = Transaction.builder()
+                .transactionId(1L)
+                .account(new AccountNumber(accountId))
+                .operationType(debitOperationType)
+                .amount(BigDecimal.valueOf(-50.0))
+                .balance(BigDecimal.valueOf(-50.0))
+                .active(true)
+                .build();
+
+        Mockito.when(operationTypeService.getOperationType())
+                .thenReturn(Mono.just(getMap(operationType)));
+
+        Mockito.when(transactionDatabaseAdapter.getAllTransactionByAccount(accountId))
+                .thenReturn(reactor.core.publisher.Flux.just(debtTransaction));
+
+        Mockito.when(transactionDatabaseAdapter.updateTransaction(Mockito.anyList()))
+                .thenReturn(Mono.empty());
+
+        Mockito.when(transactionDatabaseAdapter.saveTransaction(Mockito.any(Transaction.class)))
+                .thenAnswer(invocation -> {
+                    Transaction transaction = invocation.getArgument(0);
+                    return Mono.just(Transaction.builder()
+                            .transactionId(2L)
+                            .account(transaction.getAccount())
+                            .amount(transaction.getAmount())
+                            .balance(transaction.getBalance())
+                            .operationType(transaction.getOperationType())
+                            .build());
+                });
+
+        StepVerifier.create(paymentTransactionHandler.performTransaction(accountId, paymentAmount))
+                .expectNextMatches(resp ->
+                        resp.getAmount().compareTo(paymentAmount) == 0 &&
+                        resp.getBalance().compareTo(BigDecimal.ZERO) == 0 // All debt paid, no remaining balance
+                ).verifyComplete();
+
+        // Verify that updateTransaction was called to update the debt
+        Mockito.verify(transactionDatabaseAdapter, Mockito.times(1))
+                .updateTransaction(Mockito.anyList());
+    }
+
+    @Test
+    @DisplayName("Should pay off debt partially when payment is less than debt")
+    void shouldPayOffDebtPartially_whenPaymentLessThanDebt() {
+        Long accountId = 1L;
+        BigDecimal paymentAmount = BigDecimal.valueOf(20.0);
+
+        // Create a debt transaction with -50 balance
+        OperationType debitOperationType = new OperationType(1L,
+                "NORMAL PURCHASE", "PURCHASE", TransactionType.DEBIT);
+
+        Transaction debtTransaction = Transaction.builder()
+                .transactionId(1L)
+                .account(new AccountNumber(accountId))
+                .operationType(debitOperationType)
+                .amount(BigDecimal.valueOf(-50.0))
+                .balance(BigDecimal.valueOf(-50.0))
+                .active(true)
+                .build();
+
+        Mockito.when(operationTypeService.getOperationType())
+                .thenReturn(Mono.just(getMap(operationType)));
+
+        Mockito.when(transactionDatabaseAdapter.getAllTransactionByAccount(accountId))
+                .thenReturn(reactor.core.publisher.Flux.just(debtTransaction));
+
+        Mockito.when(transactionDatabaseAdapter.updateTransaction(Mockito.anyList()))
+                .thenReturn(Mono.empty());
+
+        Mockito.when(transactionDatabaseAdapter.saveTransaction(Mockito.any(Transaction.class)))
+                .thenAnswer(invocation -> {
+                    Transaction transaction = invocation.getArgument(0);
+                    return Mono.just(Transaction.builder()
+                            .transactionId(2L)
+                            .account(transaction.getAccount())
+                            .amount(transaction.getAmount())
+                            .balance(transaction.getBalance())
+                            .operationType(transaction.getOperationType())
+                            .build());
+                });
+
+        StepVerifier.create(paymentTransactionHandler.performTransaction(accountId, paymentAmount))
+                .expectNextMatches(resp ->
+                        resp.getAmount().compareTo(paymentAmount) == 0 &&
+                        resp.getBalance().compareTo(BigDecimal.ZERO) == 0 // All payment used, no credit balance
+                ).verifyComplete();
+
+        Mockito.verify(transactionDatabaseAdapter, Mockito.times(1))
+                .updateTransaction(Mockito.anyList());
+    }
+
+    @Test
+    @DisplayName("Should create credit balance when payment exceeds debt")
+    void shouldCreateCreditBalance_whenPaymentExceedsDebt() {
+        Long accountId = 1L;
+        BigDecimal paymentAmount = BigDecimal.valueOf(100.0);
+
+        // Create a debt transaction with -50 balance
+        OperationType debitOperationType = new OperationType(1L,
+                "NORMAL PURCHASE", "PURCHASE", TransactionType.DEBIT);
+
+        Transaction debtTransaction = Transaction.builder()
+                .transactionId(1L)
+                .account(new AccountNumber(accountId))
+                .operationType(debitOperationType)
+                .amount(BigDecimal.valueOf(-50.0))
+                .balance(BigDecimal.valueOf(-50.0))
+                .active(true)
+                .build();
+
+        Mockito.when(operationTypeService.getOperationType())
+                .thenReturn(Mono.just(getMap(operationType)));
+
+        Mockito.when(transactionDatabaseAdapter.getAllTransactionByAccount(accountId))
+                .thenReturn(reactor.core.publisher.Flux.just(debtTransaction));
+
+        Mockito.when(transactionDatabaseAdapter.updateTransaction(Mockito.anyList()))
+                .thenReturn(Mono.empty());
+
+        Mockito.when(transactionDatabaseAdapter.saveTransaction(Mockito.any(Transaction.class)))
+                .thenAnswer(invocation -> {
+                    Transaction transaction = invocation.getArgument(0);
+                    return Mono.just(Transaction.builder()
+                            .transactionId(2L)
+                            .account(transaction.getAccount())
+                            .amount(transaction.getAmount())
+                            .balance(transaction.getBalance())
+                            .operationType(transaction.getOperationType())
+                            .build());
+                });
+
+        StepVerifier.create(paymentTransactionHandler.performTransaction(accountId, paymentAmount))
+                .expectNextMatches(resp ->
+                        resp.getAmount().compareTo(paymentAmount) == 0 &&
+                        resp.getBalance().compareTo(BigDecimal.valueOf(50.0)) == 0 // 50 credit remaining
+                ).verifyComplete();
+
+        Mockito.verify(transactionDatabaseAdapter, Mockito.times(1))
+                .updateTransaction(Mockito.anyList());
+    }
+
+    @Test
+    @DisplayName("Should pay off multiple debts in FIFO order")
+    void shouldPayOffMultipleDebts_inFIFOOrder() {
+        Long accountId = 1L;
+        BigDecimal paymentAmount = BigDecimal.valueOf(80.0);
+
+        OperationType debitOperationType = new OperationType(1L,
+                "NORMAL PURCHASE", "PURCHASE", TransactionType.DEBIT);
+
+        // Create multiple debt transactions
+        Transaction debt1 = Transaction.builder()
+                .transactionId(1L)
+                .account(new AccountNumber(accountId))
+                .operationType(debitOperationType)
+                .amount(BigDecimal.valueOf(-50.0))
+                .balance(BigDecimal.valueOf(-50.0))
+                .active(true)
+                .build();
+
+        Transaction debt2 = Transaction.builder()
+                .transactionId(2L)
+                .account(new AccountNumber(accountId))
+                .operationType(debitOperationType)
+                .amount(BigDecimal.valueOf(-30.0))
+                .balance(BigDecimal.valueOf(-30.0))
+                .active(true)
+                .build();
+
+        Transaction debt3 = Transaction.builder()
+                .transactionId(3L)
+                .account(new AccountNumber(accountId))
+                .operationType(debitOperationType)
+                .amount(BigDecimal.valueOf(-20.0))
+                .balance(BigDecimal.valueOf(-20.0))
+                .active(true)
+                .build();
+
+        Mockito.when(operationTypeService.getOperationType())
+                .thenReturn(Mono.just(getMap(operationType)));
+
+        Mockito.when(transactionDatabaseAdapter.getAllTransactionByAccount(accountId))
+                .thenReturn(reactor.core.publisher.Flux.just(debt1, debt2, debt3));
+
+        Mockito.when(transactionDatabaseAdapter.updateTransaction(Mockito.anyList()))
+                .thenReturn(Mono.empty());
+
+        Mockito.when(transactionDatabaseAdapter.saveTransaction(Mockito.any(Transaction.class)))
+                .thenAnswer(invocation -> {
+                    Transaction transaction = invocation.getArgument(0);
+                    return Mono.just(Transaction.builder()
+                            .transactionId(4L)
+                            .account(transaction.getAccount())
+                            .amount(transaction.getAmount())
+                            .balance(transaction.getBalance())
+                            .operationType(transaction.getOperationType())
+                            .build());
+                });
+
+        StepVerifier.create(paymentTransactionHandler.performTransaction(accountId, paymentAmount))
+                .expectNextMatches(resp ->
+                        resp.getAmount().compareTo(paymentAmount) == 0 &&
+                        resp.getBalance().compareTo(BigDecimal.ZERO) == 0 // 50+30=80 paid, no remaining
+                ).verifyComplete();
+
+        // Verify that updateTransaction was called to update the debts
+        Mockito.verify(transactionDatabaseAdapter, Mockito.times(1))
+                .updateTransaction(Mockito.argThat(list -> list.size() == 2)); // Only first 2 debts fully paid
+    }
+
+    @Test
+    @DisplayName("Should not update transactions when there are no debts")
+    void shouldNotUpdateTransactions_whenNoDebts() {
+        Long accountId = 1L;
+        BigDecimal paymentAmount = BigDecimal.valueOf(100.0);
+
+        Mockito.when(operationTypeService.getOperationType())
+                .thenReturn(Mono.just(getMap(operationType)));
+
+        Mockito.when(transactionDatabaseAdapter.getAllTransactionByAccount(accountId))
+                .thenReturn(reactor.core.publisher.Flux.empty());
+
+        Mockito.when(transactionDatabaseAdapter.saveTransaction(Mockito.any(Transaction.class)))
+                .thenAnswer(invocation -> {
+                    Transaction transaction = invocation.getArgument(0);
+                    return Mono.just(Transaction.builder()
+                            .transactionId(1L)
+                            .account(transaction.getAccount())
+                            .amount(transaction.getAmount())
+                            .balance(transaction.getBalance())
+                            .operationType(transaction.getOperationType())
+                            .build());
+                });
+
+        StepVerifier.create(paymentTransactionHandler.performTransaction(accountId, paymentAmount))
+                .expectNextMatches(resp ->
+                        resp.getAmount().compareTo(paymentAmount) == 0 &&
+                        resp.getBalance().compareTo(paymentAmount) == 0 // Full amount as credit
+                ).verifyComplete();
+
+        // Verify updateTransaction was never called
+        Mockito.verify(transactionDatabaseAdapter, Mockito.never())
+                .updateTransaction(Mockito.anyList());
+    }
+
+    @Test
+    @DisplayName("Should ignore credit balance transactions when paying off debts")
+    void shouldIgnoreCreditBalances_whenPayingOffDebts() {
+        Long accountId = 1L;
+        BigDecimal paymentAmount = BigDecimal.valueOf(50.0);
+
+        OperationType debitOperationType = new OperationType(1L,
+                "NORMAL PURCHASE", "PURCHASE", TransactionType.DEBIT);
+
+        Transaction debtTransaction = Transaction.builder()
+                .transactionId(1L)
+                .account(new AccountNumber(accountId))
+                .operationType(debitOperationType)
+                .amount(BigDecimal.valueOf(-50.0))
+                .balance(BigDecimal.valueOf(-50.0))
+                .active(true)
+                .build();
+
+        // Credit balance transaction (should be ignored)
+        Transaction creditTransaction = Transaction.builder()
+                .transactionId(2L)
+                .account(new AccountNumber(accountId))
+                .operationType(operationType)
+                .amount(BigDecimal.valueOf(100.0))
+                .balance(BigDecimal.valueOf(100.0))
+                .active(true)
+                .build();
+
+        Mockito.when(operationTypeService.getOperationType())
+                .thenReturn(Mono.just(getMap(operationType)));
+
+        Mockito.when(transactionDatabaseAdapter.getAllTransactionByAccount(accountId))
+                .thenReturn(reactor.core.publisher.Flux.just(debtTransaction, creditTransaction));
+
+        Mockito.when(transactionDatabaseAdapter.updateTransaction(Mockito.anyList()))
+                .thenReturn(Mono.empty());
+
+        Mockito.when(transactionDatabaseAdapter.saveTransaction(Mockito.any(Transaction.class)))
+                .thenAnswer(invocation -> {
+                    Transaction transaction = invocation.getArgument(0);
+                    return Mono.just(Transaction.builder()
+                            .transactionId(3L)
+                            .account(transaction.getAccount())
+                            .amount(transaction.getAmount())
+                            .balance(transaction.getBalance())
+                            .operationType(transaction.getOperationType())
+                            .build());
+                });
+
+        StepVerifier.create(paymentTransactionHandler.performTransaction(accountId, paymentAmount))
+                .expectNextMatches(resp ->
+                        resp.getAmount().compareTo(paymentAmount) == 0 &&
+                        resp.getBalance().compareTo(BigDecimal.ZERO) == 0 // Debt paid, no remaining
+                ).verifyComplete();
+
+        // Verify only the debt transaction was updated, not the credit one
+        Mockito.verify(transactionDatabaseAdapter, Mockito.times(1))
+                .updateTransaction(Mockito.argThat(list -> list.size() == 1));
+    }
+
 
 }
+
 

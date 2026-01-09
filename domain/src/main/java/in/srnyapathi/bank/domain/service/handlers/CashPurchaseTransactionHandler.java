@@ -135,6 +135,7 @@ public class CashPurchaseTransactionHandler extends TransactionHandler {
             var tran = Transaction.builder()
                     .account(new AccountNumber(account))
                     .amount(getAmount(amount, operationType.getTransactionType()))
+                    .balance(getAmount(amount, operationType.getTransactionType()))
                     .operationType(operationType)
                     .eventDate(LocalDateTime.now())
                     .active(true)

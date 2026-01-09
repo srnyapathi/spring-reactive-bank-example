@@ -84,6 +84,8 @@ public class Transaction {
      */
     private BigDecimal amount;
 
+    private BigDecimal balance;
+
     /**
      * The date and time when the transaction event occurred.
      * <p>

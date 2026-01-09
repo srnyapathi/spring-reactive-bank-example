@@ -71,6 +71,7 @@ class TransactionDatabaseAdapterServiceTest {
                 1001L,
                 1L,
                 new BigDecimal("123.45"),
+                new BigDecimal("50.00"),
                 testDateTime,
                 testDateTime,
                 testDateTime,
@@ -125,7 +126,8 @@ class TransactionDatabaseAdapterServiceTest {
                 1001L,
                 1L,
                 new BigDecimal("50.00"),
-                testDateTime,
+                new BigDecimal("50.00"),
+                null,
                 null,
                 null,
                 true
@@ -136,9 +138,10 @@ class TransactionDatabaseAdapterServiceTest {
                 1001L,
                 1L,
                 new BigDecimal("50.00"),
+                new BigDecimal("50.00"),
                 testDateTime,
                 testDateTime,
-                testDateTime,
+                null,
                 true
         );
 
@@ -192,7 +195,8 @@ class TransactionDatabaseAdapterServiceTest {
                 1001L,
                 1L,
                 BigDecimal.ZERO,
-                testDateTime,
+                BigDecimal.ZERO,
+                null,
                 null,
                 null,
                 true
@@ -202,6 +206,7 @@ class TransactionDatabaseAdapterServiceTest {
                 300L,
                 1001L,
                 1L,
+                BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 testDateTime,
                 testDateTime,
@@ -255,7 +260,8 @@ class TransactionDatabaseAdapterServiceTest {
                 1001L,
                 1L,
                 largeAmount,
-                testDateTime,
+                largeAmount,
+                null,
                 null,
                 null,
                 true
@@ -266,11 +272,11 @@ class TransactionDatabaseAdapterServiceTest {
                 1001L,
                 1L,
                 largeAmount,
+                largeAmount,
                 testDateTime,
                 testDateTime,
                 testDateTime,
-                true
-        );
+                true);
 
         Transaction savedTransaction = Transaction.builder()
                 .transactionId(400L)
@@ -318,7 +324,8 @@ class TransactionDatabaseAdapterServiceTest {
                 1001L,
                 1L,
                 smallAmount,
-                testDateTime,
+                smallAmount,
+                null,
                 null,
                 null,
                 true
@@ -328,6 +335,7 @@ class TransactionDatabaseAdapterServiceTest {
                 500L,
                 1001L,
                 1L,
+                smallAmount,
                 smallAmount,
                 testDateTime,
                 testDateTime,
@@ -459,6 +467,7 @@ class TransactionDatabaseAdapterServiceTest {
                 1001L,
                 1L,
                 new BigDecimal("100.00"),
+                new BigDecimal("100.00"),
                 testDateTime,
                 null,
                 null,
@@ -469,6 +478,7 @@ class TransactionDatabaseAdapterServiceTest {
                 600L,
                 1001L,
                 1L,
+                new BigDecimal("100.00"),
                 new BigDecimal("100.00"),
                 testDateTime,
                 testDateTime,
@@ -699,10 +709,10 @@ class TransactionDatabaseAdapterServiceTest {
                 .active(true)
                 .build();
 
-        TransactionEntity entity1 = new TransactionEntity(null, 1001L, 1L, new BigDecimal("100.00"), testDateTime, null, null, true);
-        TransactionEntity entity2 = new TransactionEntity(null, 1001L, 1L, new BigDecimal("200.00"), testDateTime, null, null, true);
-        TransactionEntity savedEntity1 = new TransactionEntity(700L, 1001L, 1L, new BigDecimal("100.00"), testDateTime, testDateTime, testDateTime, true);
-        TransactionEntity savedEntity2 = new TransactionEntity(800L, 1001L, 1L, new BigDecimal("200.00"), testDateTime, testDateTime, testDateTime, true);
+        TransactionEntity entity1 = new TransactionEntity(null, 1001L, 1L, new BigDecimal("100.00"), new BigDecimal("100.00"), testDateTime, null, null, true);
+        TransactionEntity entity2 = new TransactionEntity(null, 1001L, 1L, new BigDecimal("200.00"), new BigDecimal("200.00"), testDateTime, null, null, true);
+        TransactionEntity savedEntity1 = new TransactionEntity(700L, 1001L, 1L, new BigDecimal("100.00"), new BigDecimal("100.00"), testDateTime, testDateTime, testDateTime, true);
+        TransactionEntity savedEntity2 = new TransactionEntity(800L, 1001L, 1L, new BigDecimal("200.00"), new BigDecimal("200.00"), testDateTime, testDateTime, testDateTime, true);
 
         Transaction saved1 = Transaction.builder().transactionId(700L).account(testAccountNumber).operationType(testOperationType).amount(new BigDecimal("100.00")).eventDate(testDateTime).createdAt(testDateTime).updatedAt(testDateTime).active(true).build();
         Transaction saved2 = Transaction.builder().transactionId(800L).account(testAccountNumber).operationType(testOperationType).amount(new BigDecimal("200.00")).eventDate(testDateTime).createdAt(testDateTime).updatedAt(testDateTime).active(true).build();
@@ -782,7 +792,8 @@ class TransactionDatabaseAdapterServiceTest {
                 1001L,
                 1L,
                 negativeAmount,
-                testDateTime,
+                new BigDecimal("50.00"),
+                null,
                 null,
                 null,
                 true
@@ -793,10 +804,11 @@ class TransactionDatabaseAdapterServiceTest {
                 1001L,
                 1L,
                 negativeAmount,
+                new BigDecimal("50.00"),
                 testDateTime,
                 testDateTime,
-                testDateTime,
-                true
+                testDateTime, true
+
         );
 
         Transaction savedTransaction = Transaction.builder()

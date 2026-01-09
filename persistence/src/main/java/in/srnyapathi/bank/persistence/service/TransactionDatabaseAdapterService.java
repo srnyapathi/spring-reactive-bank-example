@@ -1,16 +1,18 @@
 package in.srnyapathi.bank.persistence.service;
 
 import in.srnyapathi.bank.domain.adapters.TransactionDatabaseAdapter;
+import in.srnyapathi.bank.domain.exception.AccountDoesNotExist;
 import in.srnyapathi.bank.domain.exception.InvalidTransactionObjectException;
 import in.srnyapathi.bank.domain.model.Transaction;
 import in.srnyapathi.bank.persistence.mapper.TransactionMapper;
 import in.srnyapathi.bank.persistence.repository.TransactionRepository;
-import io.netty.util.internal.ObjectUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -58,6 +60,29 @@ public class TransactionDatabaseAdapterService implements TransactionDatabaseAda
                         log.error("Error saving transaction: {}", transaction.getTransactionId(), error));
     }
 
+    @Override
+    public Mono<Transaction> updateTransaction(List<Transaction> transaction) {
+        if (Objects.isNull(transaction) || transaction.isEmpty()) {
+            log.error("Transaction object is null or empty");
+            return Mono.error(new InvalidTransactionObjectException("Transaction cannot be null or empty"));
+        }
+        log.info("Updating transactions: {}", transaction.stream().map(Transaction::getTransactionId).toList());
+        return Flux.fromIterable(transaction)
+                .map(transactionMapper::toEntity)
+                .collectList()
+                .flatMapMany(transactionRepository::saveAll)
+                .map(transactionMapper::toDomain)
+                .collectList()
+                .map(updatedTransactions -> {
+                    log.info("Transactions updated successfully: {}", updatedTransactions.stream().map(Transaction::getTransactionId).toList());
+                    return updatedTransactions;
+                })
+                .flatMapMany(Flux::fromIterable)
+                .next()
+                .doOnError(error ->
+                        log.error("Error updating transactions: {}", transaction.stream().map(Transaction::getTransactionId).toList(), error));
+    }
+
     /**
      * Retrieves a transaction by its unique identifier.
      * <p>
@@ -78,4 +103,15 @@ public class TransactionDatabaseAdapterService implements TransactionDatabaseAda
                 .doOnError(error ->
                         log.error("Error fetching transaction: {}", id, error));
     }
+
+    @Override
+    public Flux<Transaction> getAllTransactionByAccount(Long id) {
+        log.info("Fetching trxn for the account id: {}", id);
+        return transactionRepository.findAllActiveByAccountId(id).
+                map(transactionMapper::toDomain)
+                .switchIfEmpty(Flux.error(new AccountDoesNotExist("Account does not exist with id: " + id)));
+
+
+    }
+
 }

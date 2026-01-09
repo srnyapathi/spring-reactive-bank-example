@@ -26,6 +26,7 @@ CREATE TABLE transactions (
     account_id        BIGINT NOT NULL REFERENCES accounts(account_id) ON DELETE RESTRICT,
     operation_type_id BIGINT NOT NULL REFERENCES operation_types(operation_id) ON DELETE RESTRICT,
     amount            NUMERIC(12,2) NOT NULL,
+    balance            NUMERIC(12,2) NOT NULL,
     event_date        TIMESTAMP(6) NOT NULL,
     created_at        TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,

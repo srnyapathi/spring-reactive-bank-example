@@ -10,10 +10,13 @@ import reactor.core.publisher.Mono;
 
 @Repository
 public interface TransactionRepository extends ReactiveCrudRepository<TransactionEntity, Long> {
-    @Query("SELECT * FROM transactions WHERE is_active = true")
+    @Query("SELECT * FROM transactions WHERE is_active = true order by event_date")
     Flux<TransactionEntity> findAllActive();
 
     @Modifying
     @Query("UPDATE transactions SET is_active = false WHERE transaction_id = $1 AND is_active = true")
     Mono<Integer> softDeleteById(Long id);
+
+    @Query("Select * from transactions where account_id = $1 AND is_active = true order by event_date")
+    Flux<TransactionEntity> findAllActiveByAccountId(Long accountId);
 }

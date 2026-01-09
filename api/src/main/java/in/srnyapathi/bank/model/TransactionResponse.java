@@ -26,6 +26,8 @@ public class TransactionResponse {
 
     @JsonProperty("amount")
     private BigDecimal amount;
+    @JsonProperty("balance")
+    private BigDecimal balance;
 
     @JsonProperty("event_date")
     private LocalDateTime eventDate;

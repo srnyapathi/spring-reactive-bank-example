@@ -1,6 +1,7 @@
 package in.srnyapathi.bank.domain.service;
 
 import in.srnyapathi.bank.domain.model.Transaction;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
@@ -15,4 +16,5 @@ import java.math.BigDecimal;
 public interface TransactionService {
 
     Mono<Transaction> performTransaction(Long account, Long operationId, BigDecimal amount);
+    Flux<Transaction> listTransactionByAccountId(Long accountId);
 }

@@ -5,15 +5,18 @@ import in.srnyapathi.bank.domain.exception.InvalidAmountException;
 import in.srnyapathi.bank.domain.model.AccountNumber;
 import in.srnyapathi.bank.domain.model.OperationType;
 import in.srnyapathi.bank.domain.model.Transaction;
+import in.srnyapathi.bank.domain.model.TransactionType;
 import in.srnyapathi.bank.domain.service.OperationTypeService;
 import in.srnyapathi.bank.domain.service.impl.TransactionHandler;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Handler for payment transactions in the banking system.
@@ -41,9 +44,9 @@ import java.time.LocalDateTime;
  *
  * @author srnyapathi
  * @version 1.0.0
- * @since 1.0.0
  * @see TransactionHandler
  * @see in.srnyapathi.bank.domain.model.TransactionType#CREDIT
+ * @since 1.0.0
  */
 @Slf4j
 @Component
@@ -54,6 +57,7 @@ public class PaymentTransactionHandler extends TransactionHandler {
      */
     private final TransactionDatabaseAdapter transactionDatabaseAdapter;
 
+
     /**
      * Constructs a new PaymentTransactionHandler with required dependencies.
      * <p>
@@ -62,7 +66,7 @@ public class PaymentTransactionHandler extends TransactionHandler {
      * </p>
      *
      * @param transactionDatabaseAdapter the adapter for transaction persistence operations
-     * @param operationTypeService the service for retrieving operation type configurations
+     * @param operationTypeService       the service for retrieving operation type configurations
      */
     public PaymentTransactionHandler(TransactionDatabaseAdapter transactionDatabaseAdapter, OperationTypeService operationTypeService) {
         super(operationTypeService);
@@ -106,26 +110,79 @@ public class PaymentTransactionHandler extends TransactionHandler {
      * </p>
      *
      * @param account the account number to credit with the payment, must be valid and active
-     * @param amount the payment amount to credit (must be positive)
+     * @param amount  the payment amount to credit (must be positive)
      * @return a {@link Mono} emitting the persisted {@link Transaction} with generated
-     *         ID and timestamps, or an error signal if the operation fails
+     * ID and timestamps, or an error signal if the operation fails
      */
     @Override
     public Mono<Transaction> execute(Long account, BigDecimal amount) {
         return getOperationType()
-                .flatMap(operationType -> {
-                    log.info("Processing Payment for account: {} with amount: {}", account, amount);
-                    var tran = Transaction.builder()
-                            .account(new AccountNumber(account))
-                            .amount(getAmount(amount, operationType.getTransactionType()))
-                            .operationType(operationType)
-                            .eventDate(LocalDateTime.now())
-                            .active(true)
-                            .build();
-                    log.info("Saving Transaction: {}", tran);
-                    return transactionDatabaseAdapter.saveTransaction(tran);
-                });
+                .flatMap(operationType ->
+
+                        transactionDatabaseAdapter.getAllTransactionByAccount(account)
+                                .collectList()
+                                .flatMap(txnList ->
+                                        getUpdatedTransactions(amount, operationType, txnList)
+
+                                ).flatMap(txnAmount -> {
+                                    log.info("Processing Payment for account: {} with amount: {}", account, amount);
+                                    var tran = Transaction.builder()
+                                            .account(new AccountNumber(account))
+                                            .amount(amount)  // Keep original payment amount positive for CREDIT
+                                            .balance(txnAmount)  // Remaining balance after paying debts
+                                            .operationType(operationType)
+                                            .eventDate(LocalDateTime.now())
+                                            .active(true)
+                                            .build();
+                                    log.info("Saving Transaction: {}", tran);
+                                    return transactionDatabaseAdapter.saveTransaction(tran);
+                                }));
+
     }
+
+    private @NonNull Mono<BigDecimal> getUpdatedTransactions(
+            BigDecimal amt,
+            OperationType operationType,
+            List<Transaction> txnList
+    ) {
+        if (operationType.getTransactionType() != TransactionType.CREDIT) {
+            return Mono.just(BigDecimal.ZERO);
+        }
+
+        BigDecimal remaining = amt == null ? BigDecimal.ZERO : amt;
+        if (remaining.signum() <= 0) {
+            return Mono.just(BigDecimal.ZERO);
+        }
+
+        List<Transaction> debts = txnList.stream()
+                .filter(txn -> txn.getBalance() != null && txn.getBalance().signum() < 0) // debit outstanding
+                .sorted(java.util.Comparator.comparing(Transaction::getTransactionId))     // FIFO
+                .toList();
+
+        List<Transaction> toUpdate = new ArrayList<>();
+
+        for (Transaction txn : debts) {
+            if (remaining.signum() <= 0) break;
+
+            // debit balance is negative (e.g., -20 means 20 outstanding)
+            var outstanding = txn.getBalance().abs();               // 20
+            var paid = remaining.min(outstanding);                  // pay only what you can
+            var newBalance = txn.getBalance().add(paid);            // -20 + 5 => -15, -15 + 15 => 0
+
+            txn.setBalance(newBalance);                                    // ONLY balance changes
+            toUpdate.add(txn);
+
+            remaining = remaining.subtract(paid);                          // subtract ONLY what was paid
+        }
+
+        Mono<Transaction> updateMono = toUpdate.isEmpty()
+                ? Mono.empty()
+                : transactionDatabaseAdapter.updateTransaction(toUpdate);
+
+        // carry-forward credit (>= 0)
+        return updateMono.thenReturn(remaining.max(BigDecimal.ZERO));
+    }
+
 
     /**
      * Validates the account and amount for a payment transaction.
@@ -137,9 +194,9 @@ public class PaymentTransactionHandler extends TransactionHandler {
      * </p>
      *
      * @param account the account number to validate, must not be null
-     * @param amount the payment amount to validate, must be positive (greater than zero)
+     * @param amount  the payment amount to validate, must be positive (greater than zero)
      * @return a {@link Mono} that completes successfully if validation passes,
-     *         or emits an {@link InvalidAmountException} if the amount is negative
+     * or emits an {@link InvalidAmountException} if the amount is negative
      */
     @Override
     protected Mono<Void> validate(Long account, BigDecimal amount) {

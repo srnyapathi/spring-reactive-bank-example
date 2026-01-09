@@ -1,6 +1,7 @@
 package in.srnyapathi.bank.domain.service.impl;
 
 import in.srnyapathi.bank.domain.adapters.OperationTypeDatabaseAdapter;
+import in.srnyapathi.bank.domain.adapters.TransactionDatabaseAdapter;
 import in.srnyapathi.bank.domain.exception.InvalidOperationTypeException;
 import in.srnyapathi.bank.domain.model.OperationType;
 import in.srnyapathi.bank.domain.model.Transaction;
@@ -10,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
@@ -52,6 +54,9 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class TransactionServiceImpl implements TransactionService {
+
+    private final TransactionDatabaseAdapter transactionDatabaseAdapter;
+
 
     /**
      * Factory for resolving transaction handlers based on operation type.
@@ -133,6 +138,11 @@ public class TransactionServiceImpl implements TransactionService {
                                 account, error));
     }
 
+    @Override
+    public Flux<Transaction> listTransactionByAccountId(Long accountId) {
+        return transactionDatabaseAdapter.getAllTransactionByAccount(accountId);
+    }
+
     /**
      * Transforms the operation types map to be indexed by operation type ID.
      * <p>
@@ -158,5 +168,8 @@ public class TransactionServiceImpl implements TransactionService {
                 .collect(Collectors.toMap(OperationType::getOperationTypeId,
                         operationType -> operationType));
     }
+
+
+
 }
 

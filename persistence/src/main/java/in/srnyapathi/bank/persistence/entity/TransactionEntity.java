@@ -46,6 +46,9 @@ public record TransactionEntity(
         @Column("amount")
         BigDecimal amount,
 
+        @Column("balance")
+        BigDecimal balance,
+
         @Column("event_date")
         LocalDateTime eventDate,
 

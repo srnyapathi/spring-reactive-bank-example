@@ -1,7 +1,10 @@
 package in.srnyapathi.bank.domain.adapters;
 
 import in.srnyapathi.bank.domain.model.Transaction;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 /**
  * Adapter interface for transaction database operations in the hexagonal architecture.
@@ -36,6 +39,8 @@ public interface TransactionDatabaseAdapter {
      */
     Mono<Transaction> saveTransaction(Transaction transaction);
 
+    Mono<Transaction> updateTransaction(List<Transaction> transaction);
+
     /**
      * Retrieves a transaction by its unique identifier.
      * <p>
@@ -49,4 +54,6 @@ public interface TransactionDatabaseAdapter {
      * @throws IllegalArgumentException if the id parameter is null
      */
     Mono<Transaction> getTransactionById(Long id);
+
+    Flux<Transaction> getAllTransactionByAccount(Long id);
 }
